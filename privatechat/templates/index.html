@@ -1,0 +1,274 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مراسلتنا الخاصة ❤️</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f0f5;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .chat {
+      max-width: 500px;
+      margin: 30px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px #00000010;
+    }
+
+    h1 { color: #8b3d69; }
+
+    input {
+      width: 70%;
+      max-width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin: 5px 0;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #8b3d69;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 15px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #messages {
+      text-align: right;
+      min-height: 150px;
+      max-height: 350px;
+      overflow-y: auto;
+      overflow-wrap: anywhere;
+      margin: 20px 0;
+    }
+
+    .message {
+      background: #f5f0f5;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 10px;
+      text-align: right;
+      white-space: pre-wrap;
+    }
+
+    .message small {
+      display: block;
+      color: #777;
+      margin-bottom: 5px;
+    }
+
+    #loginStatus, #status {
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 10px; }
+      .chat { margin: 15px auto; padding: 15px; }
+      input { width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="chat" id="loginBox">
+    <h1>مراسلتنا الخاصة ❤️</h1>
+    <p>أدخل كلمة المرور للدخول</p>
+
+    <form id="loginForm">
+      <input
+        id="passwordInput"
+        type="password"
+        placeholder="كلمة المرور"
+        autocomplete="current-password"
+        required
+      >
+      <button id="loginButton" type="submit">دخول</button>
+    </form>
+
+    <p id="loginStatus" role="status"></p>
+  </div>
+
+  <div class="chat" id="chatBox" style="display: none;">
+    <h1>مراسلتنا الخاصة ❤️</h1>
+    <p>مساحة تجمعنا</p>
+
+    <div id="messages"></div>
+
+    <form id="messageForm">
+      <input
+        id="messageInput"
+        type="text"
+        placeholder="اكتب رسالتك هنا"
+        maxlength="2000"
+        autocomplete="off"
+        required
+      >
+      <button id="sendButton" type="submit">إرسال</button>
+    </form>
+
+    <p id="status" role="status"></p>
+    <button id="logoutButton" type="button">تسجيل الخروج</button>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById("loginForm");
+    const passwordInput = document.getElementById("passwordInput");
+    const loginButton = document.getElementById("loginButton");
+    const loginStatus = document.getElementById("loginStatus");
+
+    const loginBox = document.getElementById("loginBox");
+    const chatBox = document.getElementById("chatBox");
+    const messageForm = document.getElementById("messageForm");
+    const messageInput = document.getElementById("messageInput");
+    const sendButton = document.getElementById("sendButton");
+    const messagesBox = document.getElementById("messages");
+    const status = document.getElementById("status");
+    const logoutButton = document.getElementById("logoutButton");
+
+    function displayMessage(message) {
+      const item = document.createElement("div");
+      item.className = "message";
+
+      const text = document.createElement("div");
+      text.textContent = message.text || "";
+
+      const time = document.createElement("small");
+      time.textContent = message.createdAt
+        ? new Date(message.createdAt).toLocaleString("ar")
+        : "";
+
+      item.appendChild(text);
+      item.appendChild(time);
+      messagesBox.appendChild(item);
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+
+    async function loadMessages() {
+      const response = await fetch("/messages");
+
+      if (!response.ok) {
+        throw new Error("تعذر تحميل الرسائل");
+      }
+
+      const data = await response.json();
+      messagesBox.replaceChildren();
+
+      for (const message of data.messages || []) {
+        displayMessage(message);
+      }
+    }
+
+    loginForm.addEventListener("submit", async function(event) {
+      event.preventDefault();
+
+      loginButton.disabled = true;
+      loginStatus.textContent = "جارٍ التحقق من كلمة المرور...";
+
+      try {
+        const response = await fetch("/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: passwordInput.value })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          loginStatus.textContent = "كلمة المرور غير صحيحة.";
+          return;
+        }
+
+        passwordInput.value = "";
+        loginBox.style.display = "none";
+        chatBox.style.display = "block";
+        status.textContent = "جارٍ تحميل الرسائل...";
+
+        try {
+          await loadMessages();
+          status.textContent = "تم تحميل الرسائل.";
+        } catch (error) {
+          status.textContent = "تعذر تحميل الرسائل. حاول تحديث الصفحة.";
+        }
+      } catch (error) {
+        loginStatus.textContent = "تعذر الاتصال بالخادم. تأكد من تشغيل Flask.";
+      } finally {
+        loginButton.disabled = false;
+      }
+    });
+
+    messageForm.addEventListener("submit", async function(event) {
+      event.preventDefault();
+
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      sendButton.disabled = true;
+      status.textContent = "جارٍ إرسال الرسالة...";
+
+      try {
+        const response = await fetch("/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          status.textContent = data.error || "تعذر إرسال الرسالة.";
+          return;
+        }
+
+        displayMessage(data.message);
+        messageInput.value = "";
+        status.textContent = "تم إرسال الرسالة.";
+      } catch (error) {
+        status.textContent = "تعذر الاتصال بالخادم.";
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+
+    logoutButton.addEventListener("click", async function() {
+      try {
+        const response = await fetch("/logout", { method: "POST" });
+
+        if (!response.ok) {
+          status.textContent = "تعذر تسجيل الخروج.";
+          return;
+        }
+
+        chatBox.style.display = "none";
+        loginBox.style.display = "block";
+        messagesBox.replaceChildren();
+        messageInput.value = "";
+        status.textContent = "";
+        loginStatus.textContent = "";
+      } catch (error) {
+        status.textContent = "تعذر الاتصال بالخادم.";
+      }
+    });
+  </script>
+</body>
+</html>
